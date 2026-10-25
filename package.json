@@ -1,0 +1,15 @@
+{
+  "name": "zero-notice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent harness notifications, starting with Codex and Bark",
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "hook:codex": "node ./src/codex-hook.mjs",
+    "test:push": "node ./scripts/send-test.mjs"
+  }
+}
