@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
-import { sendBark } from "../src/bark.mjs";
+import { sendBark } from "../src/channels/bark.mjs";
 
 async function withServer(handler, run) {
   const server = createServer(handler);

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 import test from "node:test";
-import { codexNotification, runCodexHook } from "../src/codex-hook.mjs";
-import { codexEventId } from "../src/dedupe.mjs";
+import { adaptCodexEvent, codexEventId } from "../src/adapters/codex.mjs";
+import { runCodexHook } from "../src/codex-hook.mjs";
+import { notificationForEvent } from "../src/core/notification.mjs";
 
 const baseEvent = {
   session_id: "session-1",
@@ -24,7 +25,7 @@ async function run(event) {
   const result = await runCodexHook({
     stdin: Readable.from([JSON.stringify(event)]),
     store: memoryStore(),
-    notify: async (notification) => sent.push(notification),
+    notifier: { send: async (notification) => sent.push(notification) },
   });
   return { result, sent };
 }
@@ -38,16 +39,19 @@ test("Stop creates a completion notification without conversation content", asyn
   assert.equal(JSON.stringify(sent[0]).includes("private result"), false);
 });
 
-test("PermissionRequest identifies the tool but does not expose its input", async () => {
-  const notification = codexNotification({
+test("PermissionRequest identifies the tool but does not expose its input", () => {
+  const event = adaptCodexEvent({
     ...baseEvent,
     hook_event_name: "PermissionRequest",
     tool_name: "Bash",
     tool_input: { command: "secret-command" },
   });
+  assert.equal(event.type, "approval_required");
+  assert.equal(event.toolName, "Bash");
+  const notification = notificationForEvent(event);
   assert.equal(notification.title, "Codex · example-project · 等待确认");
   assert.equal(notification.body, "等待 Bash 操作的权限确认。");
-  assert.equal(JSON.stringify(notification).includes("secret-command"), false);
+  assert.equal(JSON.stringify({ event, notification }).includes("secret-command"), false);
 });
 
 test("unrelated events are ignored", async () => {
@@ -59,9 +63,9 @@ test("unrelated events are ignored", async () => {
 test("a delivered event is not sent twice", async () => {
   const store = memoryStore();
   const sent = [];
-  const notify = async (event) => sent.push(event);
-  const first = await runCodexHook({ stdin: Readable.from([JSON.stringify(baseEvent)]), store, notify });
-  const second = await runCodexHook({ stdin: Readable.from([JSON.stringify(baseEvent)]), store, notify });
+  const notifier = { send: async (event) => sent.push(event) };
+  const first = await runCodexHook({ stdin: Readable.from([JSON.stringify(baseEvent)]), store, notifier });
+  const second = await runCodexHook({ stdin: Readable.from([JSON.stringify(baseEvent)]), store, notifier });
   assert.deepEqual(first, { sent: true });
   assert.deepEqual(second, { duplicate: true });
   assert.equal(sent.length, 1);
@@ -79,7 +83,7 @@ test("failed delivery is not marked as sent", async () => {
     runCodexHook({
       stdin: Readable.from([JSON.stringify(baseEvent)]),
       store,
-      notify: async () => { throw new Error("offline"); },
+      notifier: { send: async () => { throw new Error("offline"); } },
     }),
     /offline/,
   );

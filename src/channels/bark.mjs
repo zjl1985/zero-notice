@@ -1,3 +1,5 @@
+import { getBarkConfig } from "../config.mjs";
+
 export async function sendBark({ deviceKey, baseUrl, title, body, group, timeoutMs = 8_000 }) {
   const url = new URL(
     `/${encodeURIComponent(deviceKey)}/${encodeURIComponent(title)}/${encodeURIComponent(body)}`,
@@ -25,4 +27,13 @@ export async function sendBark({ deviceKey, baseUrl, title, body, group, timeout
     if (error instanceof SyntaxError) throw new Error("Bark returned an invalid JSON response");
     throw error;
   }
+}
+
+export function createBarkNotifier({ loadConfig = getBarkConfig, deliver = sendBark } = {}) {
+  return {
+    async send(notification) {
+      // Load credentials lazily so ignored events and imports do not require Bark configuration.
+      await deliver({ ...loadConfig(), ...notification });
+    },
+  };
 }

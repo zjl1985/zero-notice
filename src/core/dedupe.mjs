@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -78,23 +77,4 @@ export class SentEventStore {
       }
     }
   }
-}
-
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
-  return value;
-}
-
-export function codexEventId(event) {
-  // PermissionRequest does not guarantee tool_use_id. Hash input locally;
-  // never persist or transmit commands or other arguments.
-  const identity = [
-    event.session_id || "unknown-session", event.cwd || "",
-    event.turn_id || "unknown-turn", event.hook_event_name,
-    event.hook_event_name === "PermissionRequest"
-      ? [event.tool_name, event.tool_use_id || event.request_id || event.approval_id || canonical(event.tool_input)]
-      : event.turn_id ? "" : event.last_assistant_message || "",
-  ];
-  return `codex:${createHash("sha256").update(JSON.stringify(identity)).digest("hex")}`;
 }

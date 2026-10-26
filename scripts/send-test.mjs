@@ -1,4 +1,4 @@
-import { sendBark } from "../src/bark.mjs";
+import { sendBark } from "../src/channels/bark.mjs";
 import { getBarkConfig } from "../src/config.mjs";
 
 await sendBark({

@@ -7,6 +7,35 @@
 
 Hook 后台执行，不返回批准、拒绝或继续运行的控制指令，也不会把命令内容或最终回答发送到 Bark。
 
+## 架构
+
+当前只有 Codex 适配器和 Bark 渠道，但事件处理已经按 harness、核心逻辑和投递渠道解耦：
+
+```text
+Codex / Pi / Claude / 其他入口
+              ↓ adapters：解析来源事件，生成统一 AgentEvent
+       core：事件校验、通知文案、并发去重
+              ↓ notifier.send(notification)
+       channels：Bark 或其他投递渠道
+```
+
+`AgentEvent` 的契约定义在 `src/core/event.mjs`。适配器生成稳定且带来源前缀的事件 ID，并只传递安全展示字段，不把原始对话、命令或凭据交给核心。核心不引用具体 harness 或 Bark；渠道只接收标题、正文和分组。
+
+```text
+src/
+├── adapters/codex.mjs       # Codex stdin、事件映射和事件身份
+├── channels/bark.mjs        # Bark 请求及 Notifier 接口
+├── core/
+│   ├── event.mjs            # 跨 harness 事件契约
+│   ├── notification.mjs     # 统一事件到通知文案
+│   ├── dispatch.mjs         # 去重与投递流程
+│   └── dedupe.mjs           # 通用持久化存储和并发锁
+├── config.mjs               # 固定的 .env 加载与 Bark 配置
+└── codex-hook.mjs           # Codex 组合入口，保持安装路径不变
+```
+
+新增 harness 时实现 adapter 并复用 `dispatchAgentEvent()`；新增推送渠道时实现 `{ send(notification) }`。适配器和渠道可以独立测试。
+
 ## 配置
 
 在项目根目录创建 `.env`：
